@@ -47,15 +47,19 @@ class Workspace:
             raise WorkspaceNotConfigured(root_path)
 
         self.config = WorkspaceConfig.from_file(self.cfg_path)
-
-    def get_repos(self) -> List[tsrc.Repo]:
-        all_repos = self.config.clone_all_repos
-        repo_groups = self.config.repo_groups
-        manifest = self.get_manifest()
-        if all_repos:
-            return manifest.get_repos(all_=True)
-        else:
-            return manifest.get_repos(groups=repo_groups)
+        # Note: at this point the repositories on which the user wishes to
+        # execute an action is unknown. It will be set
+        # this list after processing the command line arguments
+        # (like `--group` or `--all-cloned`)
+        #
+        # In particular, you _cannot assume_ that every repo in this list was
+        # cloned - in other words, don't use `workspace.root_path / repo.dest`
+        # without checking that the path exists!
+        # This is because there can be a mismatch between the state of
+        # the workspace and the requested repos - for instance, the user could
+        # have configured a workspace with a `backend` group, but using
+        # a disjoint `front-end` group on the command line.
+        self.repos: List[tsrc.Repo] = []
 
     def get_manifest(self) -> tsrc.Manifest:
         return self.local_manifest.get_manifest()
@@ -67,7 +71,7 @@ class Workspace:
 
     def clone_missing(self) -> None:
         to_clone = []
-        for repo in self.get_repos():
+        for repo in self.repos:
             repo_path = self.root_path / repo.dest
             if not repo_path.exists():
                 to_clone.append(repo)
@@ -81,10 +85,10 @@ class Workspace:
     def set_remotes(self) -> None:
         if not self.config.singular_remote:
             remote_setter = RemoteSetter(self.root_path)
-            tsrc.executor.run_sequence(self.get_repos(), remote_setter)
+            tsrc.executor.run_sequence(self.repos, remote_setter)
 
     def copy_files(self) -> None:
-        repos = self.get_repos()
+        repos = self.repos
         file_copier = FileCopier(self.root_path, repos)
         manifest = self.local_manifest.get_manifest()
         copyfiles = manifest.copyfiles
@@ -94,14 +98,15 @@ class Workspace:
         syncer = Syncer(
             self.root_path, force=force, remote_name=self.config.singular_remote
         )
+        repos = self.repos
         try:
-            tsrc.executor.run_sequence(self.get_repos(), syncer)
+            tsrc.executor.run_sequence(repos, syncer)
         finally:
             syncer.display_bad_branches()
 
     def enumerate_repos(self) -> Iterable[Tuple[int, tsrc.Repo, Path]]:
         """ Yield (index, repo, full_path) for all the repos """
-        for i, repo in enumerate(self.get_repos()):
+        for i, repo in enumerate(self.repos):
             full_path = self.root_path / repo.dest
             yield (i, repo, full_path)
 
