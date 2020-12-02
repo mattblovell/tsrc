@@ -1,13 +1,24 @@
-from typing import cast, Optional, List, Tuple  # noqa
-from path import Path
+from pathlib import Path
+from typing import List, Optional, Tuple, cast  # noqa
 
 import tsrc
 import tsrc.manifest
 
 
 class LocalManifest:
-    """ Represent a manifest that has been cloned locally inside the
-    hidden <workspace>/.tsrc/manifest
+    """Represent a manifest repository that has been cloned locally
+    inside `<workspace>/.tsrc/manifest`.
+
+    Usage:
+
+    >>> local_manifest = LocalManifest(Path(workspace / ".tsrc/manifest")
+
+    # First, update the cloned repository using a remote git URL and a
+    # branch:
+    >>> manifest.update("git@acme.com/manifest.git", branch="devel")
+
+    # Then, read the `manifest.yml` file from the clone repository:
+    >>> manifest = local_manifest.get_manifest()
 
     """
 
@@ -38,6 +49,7 @@ class LocalManifest:
         tsrc.git.run(self.clone_path, "reset", "--hard", ref)
 
     def _clone_manifest(self, url: str, *, branch: str) -> None:
-        parent, name = self.clone_path.splitpath()
-        parent.makedirs_p()
+        parent = self.clone_path.parent
+        name = self.clone_path.name
+        parent.mkdir(parents=True, exist_ok=True)
         tsrc.git.run(self.clone_path.parent, "clone", url, "--branch", branch, name)

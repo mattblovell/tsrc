@@ -1,10 +1,10 @@
 """ Implementation of the tsrc Workspace: a collection of git repositories
 """
 
+from pathlib import Path
 from typing import Iterable, List, Tuple
 
 import cli_ui as ui
-from path import Path
 import ruamel.yaml
 
 import tsrc
@@ -50,7 +50,7 @@ class Workspace:
 
         # Note: at this point the repositories on which the user wishes to
         # execute an action is unknown. This list will be set after processing
-        # the command line arguments (like `--group` or `--all-cloned`)
+        # the command line arguments (like `--group` or `--all-cloned`).
         #
         # In particular, you _cannot assume_ that every repo in this list was
         # cloned - in other words, don't use `workspace.root_path / repo.dest`

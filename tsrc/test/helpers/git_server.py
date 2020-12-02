@@ -1,25 +1,32 @@
-from typing import cast, Any, Dict, List, Tuple, Optional
-import ruamel.yaml
-import pytest
+""" The GitServer class can create bare git repositories and a manifest
+that contains valid git URLs.
 
-from path import Path
+It is mostly used by the end-to-end tests in tsrc/test/cli/.
+"""
+
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, cast
+
 import pygit2
+import pytest
+import ruamel.yaml
 
 RepoConfig = Dict[str, Any]
 CopyConfig = Tuple[str, str]
 RemoteConfig = Tuple[str, str]
 
 
-class TestRepo:
+class BareRepo:
+    """ Simple wrapper over pygit2. """
+
     user = pygit2.Signature("Tasty Test", "test@tsrc.io")
 
     def __init__(self, path: Path) -> None:
         self._repo = pygit2.Repository(str(path))
+        self.path = path
 
     @classmethod
-    def create_bare(
-        cls, path: Path, initial_branch: str, empty: bool = False
-    ) -> "TestRepo":
+    def create(cls, path: Path, initial_branch: str, empty: bool = False) -> "BareRepo":
         repo = pygit2.init_repository(str(path), bare=True, initial_head=initial_branch)
         if empty:
             return cls(path)
@@ -77,7 +84,18 @@ class TestRepo:
 
 
 class ManifestHandler:
-    def __init__(self, repo: TestRepo) -> None:
+    """Contains methods to update repositories configuration
+    in the manifest repo.
+
+    Data is written directly to the underlying BareRepo instance,
+    using `refs/heads/master` ref by default.
+
+    After a call `change_branch(new_branch)`, changes will be
+    written to refs/heads/new_branch` instead.
+    """
+
+    def __init__(self, repo: BareRepo) -> None:
+
         self.repo = repo
         self.data = {"repos": []}  # type: Dict[str, Any]
         self.branch = "master"
@@ -158,6 +176,14 @@ class ManifestHandler:
 
 
 class GitServer:
+    """
+    Holds a collection of git repositories in `self.bare_path, itself a
+    subdirectory of `tmpdir`.
+
+    Also uses a ManifestHandler instance to update the manifest
+    configuration, like adding a new repo.
+    """
+
     def __init__(self, tmpdir: Path) -> None:
         self.tmpdir = tmpdir
         self.bare_path = tmpdir / "srv"
@@ -167,21 +193,21 @@ class GitServer:
         self.manifest = ManifestHandler(manifest_repo)
 
     def get_url(self, name: str) -> str:
-        return str("file://" + (self.bare_path / name))
+        return f"file://{self.bare_path / name}"
 
-    def _get_repo(self, name: str) -> TestRepo:
+    def _get_repo(self, name: str) -> BareRepo:
         repo_path = self.bare_path / name
-        return TestRepo(repo_path)
+        return BareRepo(repo_path)
 
     def _create_repo(
         self, name: str, empty: bool = False, branch: str = "master"
-    ) -> TestRepo:
+    ) -> BareRepo:
         repo_path = self.bare_path / name
         assert (
             not repo_path.exists()
         ), f"cannot create repo in {repo_path}: this folder already exits"
-        repo_path.makedirs()
-        repo = TestRepo.create_bare(repo_path, initial_branch=branch, empty=empty)
+        repo_path.mkdir(parents=True, exist_ok=True)
+        repo = BareRepo.create(repo_path, initial_branch=branch, empty=empty)
         return repo
 
     def add_repo(

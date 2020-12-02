@@ -1,6 +1,8 @@
-""" Support for finding elements inside a list of groups """
+""" Support for groups of elements """
+# Note that groups are allowed to include other groups.
 
 from typing import Any, Dict, Generic, Iterable, List, Optional, Set, TypeVar  # noqa
+
 import tsrc
 
 T = TypeVar("T")
@@ -42,6 +44,16 @@ class UnknownElement(GroupError):
 
 
 class GroupList(Generic[T]):
+    """Usage:
+
+    >>> group_list = GroupList()
+    >>> group_list.add("group1", ["foo", "bar"])
+    >>> group_list.add("group2", ["spam"], includes=["group"])
+    >>> elements = group_list.get_elements(groups=["group2"])
+    ["spam", "foo", "bar"]
+
+    """
+
     def __init__(self, *, elements: Iterable[T]) -> None:
         self.groups = {}  # type: Dict[str, Group[T]]
         self.all_elements = elements
@@ -59,6 +71,12 @@ class GroupList(Generic[T]):
         return self.groups.get(name)
 
     def get_elements(self, groups: List[str]) -> Iterable[T]:
+        # Note: to get all elements in a group, recursively parse
+        # the groups and their includes, while making sure no
+        # group is processed twice.
+        #
+        # This algorithms allows to have groups that include each other
+        # without creating infinite loops.
         self._groups_seen = set()
         res = set()  # type: Set[T]
         self._rec_get_elements(res, groups, parent_group=None)

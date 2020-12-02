@@ -1,25 +1,28 @@
-""" Fixtures for tsrc testing """
+""" Fixtures for tsrc testing. """
 
+from pathlib import Path
 from typing import Any, Iterator
-from path import Path
+
 import pytest
+from cli_ui.tests import MessageRecorder
 
 import tsrc
 
-from cli_ui.tests import MessageRecorder
-from .helpers.git_server import git_server  # noqa
 from .helpers.cli import tsrc_cli  # noqa
+from .helpers.git_server import git_server  # noqa
 
 
 @pytest.fixture()
 def tmp_path(tmpdir: Any) -> Path:
-    """ Convert py.path.Local() to Path() objects """
+    """ Convert py.path.Local() to Path() objects. """
     return Path(tmpdir.strpath)
 
 
 @pytest.fixture
 def workspace_path(tmp_path: Path) -> Path:
-    return (tmp_path / "work").mkdir()
+    res = tmp_path / "work"
+    res.mkdir()
+    return res
 
 
 @pytest.fixture
